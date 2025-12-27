@@ -1,34 +1,48 @@
-from flask import Flask, send_from_directory, jsonify
+from flask import Flask, request, send_from_directory, render_template
 import os
 
 app = Flask(__name__)
 
-BASE_MUSIC_PATH = os.path.join(os.getcwd(), "music")
+# Base music folder (update if needed)
+BASE_PATH = r"C:\Users\Ashwa\Desktop\MoodMusic\music"
 MOODS = ["happy", "sad", "angry", "neutral"]
 
-@app.route('/')
+# Ensure folders exist
+for mood in MOODS:
+    os.makedirs(os.path.join(BASE_PATH, mood), exist_ok=True)
+
+@app.route("/")
 def index():
-    return send_from_directory('.', 'index.html')  
+    return render_template("index.html")
 
-@app.route('/songs/<mood>')
-def get_songs(mood):
+@app.route("/upload/<mood>", methods=["POST"])
+def upload_song(mood):
     if mood not in MOODS:
-        return jsonify({"error": "Invalid mood"}), 400
+        return "Invalid mood", 400
+    if 'file' not in request.files:
+        return "No file part", 400
+    file = request.files['file']
+    if file.filename == '':
+        return "No selected file", 400
 
-    folder_path = os.path.join(BASE_MUSIC_PATH, mood)
-    if not os.path.exists(folder_path):
-        return jsonify([])
+    save_path = os.path.join(BASE_PATH, mood, file.filename)
+    file.save(save_path)
+    return "Upload successful", 200
 
-    # List all MP3 files in the folder
-    songs = [f for f in os.listdir(folder_path) if f.lower().endswith(".mp3")]
-    return jsonify(songs)
-
-@app.route('/songs/<mood>/<filename>')
+@app.route("/songs/<mood>/<filename>")
 def serve_song(mood, filename):
     if mood not in MOODS:
         return "Invalid mood", 400
-    folder_path = os.path.join(BASE_MUSIC_PATH, mood)
-    return send_from_directory(folder_path, filename)
+    folder = os.path.join(BASE_PATH, mood)
+    return send_from_directory(folder, filename)
+
+@app.route("/playlist/<mood>")
+def get_playlist(mood):
+    if mood not in MOODS:
+        return "Invalid mood", 400
+    folder = os.path.join(BASE_PATH, mood)
+    songs = os.listdir(folder)
+    return {"songs": songs}
 
 if __name__ == "__main__":
     app.run(debug=True)
